@@ -1,0 +1,63 @@
+name: Delete All Shopify Products
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # 매 30분마다 실행
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  delete-eastkentnorth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Delete products - EastKentNorth
+        env:
+          SHOP: cwzgqw-jv.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_EASTKENTNORTH }}
+        run: node delete_products.js "$SHOP" "$TOKEN" "EastKentNorth"
+
+  delete-pikatechno:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Delete products - Pikatechno
+        env:
+          SHOP: trytdw-1j.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_PIKATECHNO }}
+        run: node delete_products.js "$SHOP" "$TOKEN" "Pikatechno"
+
+  delete-anjcompany:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Delete products - A&J Company
+        env:
+          SHOP: p11pu6-uw.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_ANJCOMPANY }}
+        run: node delete_products.js "$SHOP" "$TOKEN" "AandJ"
+
+  delete-fluffco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Delete products - FluffCo
+        env:
+          SHOP: zvyc6g-jz.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_FLUFFCO }}
+        run: node delete_products.js "$SHOP" "$TOKEN" "FluffCo"
