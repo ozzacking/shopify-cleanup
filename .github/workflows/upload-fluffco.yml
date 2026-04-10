@@ -1,0 +1,25 @@
+name: Upload Products to FluffCo
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  upload-fluffco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Download product dataset
+        run: curl -L -o products_fluffco.jsonl https://github.com/ozzacking/shopify-cleanup/releases/download/fluffco-dataset-v1/products_fluffco.jsonl
+      - name: Upload products to FluffCo
+        env:
+          SHOP: zvyc6g-jz.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_FLUFFCO }}
+          JSONL_FILE: products_fluffco.jsonl
+        run: node upload_fluffco.js
+
