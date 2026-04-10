@@ -206,29 +206,52 @@ async function runBulkOperation(stagedUploadPath) {
   throw new Error('bulkOperation 3회 실패');
 }
 
-// Bulk Operation 폴링
+// Bulk Operation 폴링 (ID로 직접 조회)
 async function pollBulkOperation(operationId) {
   console.log(`[Poll] 대기 중... id=${operationId}`);
   let attempts = 0;
+  let nullCount = 0;
 
   while (true) {
     await sleep(attempts < 5 ? 10000 : 30000);
     attempts++;
 
-    const result = await gql(`query {
-      currentBulkOperation {
-        id status errorCode url rootObjectCount
+    // ID로 직접 조회
+    const result = await gql(`query getOp($id: ID!) {
+      node(id: $id) {
+        ... on BulkOperation {
+          id status errorCode url rootObjectCount
+        }
       }
-    }`);
+    }`, { id: operationId });
 
-    const op = result.data?.currentBulkOperation;
-    if (!op) { console.log('[Poll] 응답 없음, 재시도...'); continue; }
+    const op = result.data?.node;
 
-    if (op.id !== operationId) {
-      console.log('[Poll] 완료됨 (다른 operation 실행 중)');
-      return { success: true };
+    // node 조회 실패 시 currentBulkOperation 폴백
+    if (!op || !op.status) {
+      const fallback = await gql(`query { currentBulkOperation { id status errorCode url rootObjectCount } }`);
+      const cur = fallback.data?.currentBulkOperation;
+
+      if (!cur) {
+        nullCount++;
+        if (nullCount >= 3) {
+          console.log('[Poll] Bulk Operation 완료됨 (결과 없음)');
+          return { success: true, url: null };
+        }
+        console.log(`[Poll] 응답 없음 (${nullCount}/3), 재시도...`);
+        continue;
+      }
+
+      if (cur.id === operationId || cur.status === 'COMPLETED') {
+        console.log(`[Poll] ${cur.status}`);
+        if (cur.status === 'COMPLETED') return { success: true, url: cur.url };
+        if (cur.status === 'FAILED') return { success: false, error: cur.errorCode };
+      }
+      nullCount = 0;
+      continue;
     }
 
+    nullCount = 0;
     console.log(`[Poll] ${op.status} (${op.rootObjectCount || 0}개 처리됨)`);
 
     if (op.status === 'COMPLETED') return { success: true, url: op.url };
