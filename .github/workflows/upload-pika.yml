@@ -1,0 +1,30 @@
+name: Upload Products to Pikatechno
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'  # 6시간마다 (일일 제한 시 자동 재시작)
+
+jobs:
+  upload-pikatechno:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download product dataset
+        run: |
+          curl -L -o products_pika.jsonl             https://github.com/ozzacking/shopify-cleanup/releases/download/pika-dataset-v1/products_pika.jsonl
+          echo "다운로드 완료: $(wc -l < products_pika.jsonl)줄"
+
+      - name: Upload products to Pikatechno
+        env:
+          SHOP: trytdw-1j.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_PIKATECHNO }}
+          JSONL_FILE: products_pika.jsonl
+        run: node upload_pika.js
