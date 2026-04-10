@@ -262,7 +262,7 @@ async function pollBulkOperation(operationId) {
 
 // 결과 파싱
 async function parseResults(resultUrl) {
-  if (!resultUrl) return { success: 0, failed: 0, dailyLimit: false };
+  if (!resultUrl) return { success: 0, failed: 0, dailyLimit: false, productIds: [] };
 
   return new Promise((resolve) => {
     const parsedUrl = new URL(resultUrl);
@@ -270,6 +270,7 @@ async function parseResults(resultUrl) {
 
     lib.get(resultUrl, (res) => {
       let success = 0, failed = 0, dailyLimit = false;
+      const productIds = [];
       const rl = readline.createInterface({ input: res });
 
       rl.on('line', (line) => {
@@ -286,14 +287,112 @@ async function parseResults(resultUrl) {
           const ps = obj.data?.productSet || obj.productSet;
           if (ps) {
             if (ps.userErrors && ps.userErrors.length > 0) failed++;
-            else if (ps.product?.id) success++;
+            else if (ps.product?.id) {
+              success++;
+              productIds.push(ps.product.id);
+            }
           }
         } catch {}
       });
 
-      rl.on('close', () => resolve({ success, failed, dailyLimit }));
-    }).on('error', () => resolve({ success: 0, failed: 0, dailyLimit: false }));
+      rl.on('close', () => resolve({ success, failed, dailyLimit, productIds }));
+    }).on('error', () => resolve({ success: 0, failed: 0, dailyLimit: false, productIds: [] }));
   });
+}
+
+// 상품 공개 (productUpdate로 publishedAt 설정)
+async function publishProducts(productIds) {
+  if (productIds.length === 0) return;
+  console.log(`[Publish] ${productIds.length}개 상품 공개 처리 중...`);
+
+  const now = new Date().toISOString();
+  const jsonlLines = productIds.map(id =>
+    JSON.stringify({ input: { id, publishedAt: now } })
+  );
+
+  const mutationDoc = `mutation call($input: ProductInput!) {
+    productUpdate(input: $input) {
+      product { id publishedAt }
+      userErrors { field message }
+    }
+  }`;
+
+  let stagedTarget;
+  try {
+    stagedTarget = await stagedUploadsCreate();
+  } catch(e) {
+    console.error('[Publish] staged upload 실패:', e.message);
+    return;
+  }
+
+  const s3Result = await uploadToS3(stagedTarget.url, stagedTarget.parameters, jsonlLines.join('\n'));
+  if (!s3Result || s3Result.status >= 300) {
+    console.error('[Publish] S3 업로드 실패');
+    return;
+  }
+
+  const fileKey = stagedTarget.parameters.find(p => p.name === 'key')?.value;
+  await pollUntilDone();
+
+  const result = await gql(`mutation bulkOperationRunMutation($mutation: String!, $stagedUploadPath: String!) {
+    bulkOperationRunMutation(mutation: $mutation, stagedUploadPath: $stagedUploadPath) {
+      bulkOperation { id status }
+      userErrors { message field }
+    }
+  }`, { mutation: mutationDoc, stagedUploadPath: fileKey });
+
+  const userErrors = result.data?.bulkOperationRunMutation?.userErrors || [];
+  if (userErrors.length > 0) {
+    console.error('[Publish] 오류:', userErrors.map(e => e.message).join(', '));
+    return;
+  }
+
+  const op = result.data?.bulkOperationRunMutation?.bulkOperation;
+  if (!op) { console.error('[Publish] bulk operation 시작 실패'); return; }
+
+  console.log(`[Publish] Bulk Operation 시작: ${op.id}`);
+  await pollBulkOperation(op.id);
+  console.log(`[Publish] ✅ ${productIds.length}개 공개 완료`);
+}
+
+// 기존 미공개 상품 공개 (이전 실행에서 업로드된 상품)
+async function publishExistingUnpublished() {
+  console.log('[Publish] 기존 미공개 상품 확인 중...');
+  const ids = [];
+  let cursor = null;
+
+  while (true) {
+    const result = await gql(`query getUnpublished($cursor: String) {
+      products(first: 250, after: $cursor, query: "status:active") {
+        pageInfo { hasNextPage endCursor }
+        nodes { id publishedAt }
+      }
+    }`, { cursor });
+
+    const products = result.data?.products;
+    if (!products) break;
+
+    for (const p of products.nodes) {
+      if (!p.publishedAt) ids.push(p.id);
+    }
+
+    if (!products.pageInfo.hasNextPage) break;
+    cursor = products.pageInfo.endCursor;
+    await sleep(200);
+  }
+
+  if (ids.length === 0) {
+    console.log('[Publish] 미공개 상품 없음');
+    return;
+  }
+
+  console.log(`[Publish] 미공개 상품 ${ids.length}개 발견`);
+  // 2500개씩 배치 처리
+  for (let i = 0; i < ids.length; i += 2500) {
+    const batch = ids.slice(i, i + 2500);
+    await publishProducts(batch);
+    if (i + 2500 < ids.length) await sleep(5000);
+  }
 }
 
 // 현재 실행 중인 bulk operation 확인
@@ -314,10 +413,13 @@ async function main() {
   // 1. Location ID
   const locationId = await getLocationId();
 
-  // 2. 기존 handle 로드
+  // 2. 기존 미공개 상품 공개 (이전 실행에서 업로드됐지만 미공개인 상품)
+  await publishExistingUnpublished();
+
+  // 3. 기존 handle 로드
   const existingHandles = await loadExistingHandles();
 
-  // 3. JSONL 파일 로드 + location ID 교체 + 중복 제거
+  // 4. JSONL 파일 로드 + location ID 교체 + 중복 제거
   console.log(`\n[데이터] ${JSONL_FILE} 로딩...`);
   const rawLines = fs.readFileSync(JSONL_FILE, 'utf8').split('\n').filter(l => l.trim());
   console.log(`[데이터] ${rawLines.length}개 로드됨`);
@@ -356,7 +458,7 @@ async function main() {
   console.log(`[데이터] 업로드 대상: ${lines.length}개 (중복 스킵: ${skippedDup}개)`);
   if (lines.length === 0) { console.log('✅ 업로드할 상품 없음 (모두 중복)'); return; }
 
-  // 4. 배치 처리
+  // 5. 배치 처리
   const totalBatches = Math.ceil(lines.length / BATCH_SIZE);
   let totalSuccess = 0, totalFailed = 0, dailyLimitReached = false;
 
@@ -432,6 +534,11 @@ async function main() {
 
     console.log(`[Batch ${batchNum}] 완료 - 성공: ${stats.success}, 실패: ${stats.failed}${stats.dailyLimit ? ' ⚠️ 일일제한' : ''}`);
     console.log(`[전체] 누적 성공: ${totalSuccess}개`);
+
+    // 업로드된 상품 공개
+    if (stats.productIds.length > 0) {
+      await publishProducts(stats.productIds);
+    }
   }
 
   console.log('\n========================================');
