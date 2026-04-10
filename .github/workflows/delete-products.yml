@@ -34,16 +34,3 @@ jobs:
           TOKEN: ${{ secrets.TOKEN_ANJCOMPANY }}
         run: node delete_products.js "$SHOP" "$TOKEN" "AandJ"
 
-  delete-fluffco:
-    runs-on: ubuntu-latest
-    timeout-minutes: 350
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Delete products - FluffCo
-        env:
-          SHOP: zvyc6g-jz.myshopify.com
-          TOKEN: ${{ secrets.TOKEN_FLUFFCO }}
-        run: node delete_products.js "$SHOP" "$TOKEN" "FluffCo"
