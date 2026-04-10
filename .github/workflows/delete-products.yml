@@ -2,13 +2,13 @@ name: Delete All Shopify Products
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # 매 30분마다 실행
+    - cron: '0 */6 * * *'  # 6시간마다 실행
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:
   delete-eastkentnorth:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,7 +22,7 @@ jobs:
 
   delete-pikatechno:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,7 +36,7 @@ jobs:
 
   delete-anjcompany:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,7 +50,7 @@ jobs:
 
   delete-fluffco:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
