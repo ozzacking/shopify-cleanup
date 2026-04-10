@@ -2,8 +2,8 @@ name: Delete All Shopify Products
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # 6시간마다 실행
-  workflow_dispatch:  # 수동 실행 가능
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   delete-eastkentnorth:
@@ -19,20 +19,6 @@ jobs:
           SHOP: cwzgqw-jv.myshopify.com
           TOKEN: ${{ secrets.TOKEN_EASTKENTNORTH }}
         run: node delete_products.js "$SHOP" "$TOKEN" "EastKentNorth"
-
-  delete-pikatechno:
-    runs-on: ubuntu-latest
-    timeout-minutes: 350
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Delete products - Pikatechno
-        env:
-          SHOP: trytdw-1j.myshopify.com
-          TOKEN: ${{ secrets.TOKEN_PIKATECHNO }}
-        run: node delete_products.js "$SHOP" "$TOKEN" "Pikatechno"
 
   delete-anjcompany:
     runs-on: ubuntu-latest
