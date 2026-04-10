@@ -40,19 +40,26 @@ async function gql(query, variables = {}) {
   });
 }
 
-// Location ID 가져오기
+// Location ID 가져오기 (없으면 null 반환 - 드롭쉬핑은 재고 불필요)
 async function getLocationId() {
-  const result = await gql(`query {
-    locations(first: 10) {
-      nodes { id name isPrimary }
+  try {
+    const result = await gql(`query {
+      locations(first: 10) {
+        nodes { id name isPrimary }
+      }
+    }`);
+    const locations = result.data?.locations?.nodes || [];
+    if (locations.length === 0) {
+      console.log('[Location] 접근 권한 없음 - 재고 추적 없이 업로드');
+      return null;
     }
-  }`);
-  const locations = result.data?.locations?.nodes || [];
-  console.log('[Location] 발견된 위치:', locations.map(l => `${l.name} (${l.id})`).join(', '));
-  const primary = locations.find(l => l.isPrimary) || locations[0];
-  if (!primary) throw new Error('Location을 찾을 수 없음');
-  console.log('[Location] 사용:', primary.name, primary.id);
-  return primary.id;
+    const primary = locations.find(l => l.isPrimary) || locations[0];
+    console.log('[Location] 사용:', primary.name, primary.id);
+    return primary.id;
+  } catch(e) {
+    console.log('[Location] 조회 실패, 재고 없이 진행:', e.message);
+    return null;
+  }
 }
 
 // 기존 handle 로드 (중복 제거용)
@@ -299,9 +306,21 @@ async function main() {
       const obj = JSON.parse(line);
       const handle = obj.input?.handle?.toLowerCase();
       if (handle && existingHandles.has(handle)) { skippedDup++; continue; }
-      // Location ID 교체
-      const replaced = line.replace(/__LOCATION_ID__/g, locationId);
-      lines.push(replaced);
+
+      if (locationId) {
+        // Location ID 교체
+        const replaced = line.replace(/__LOCATION_ID__/g, locationId);
+        lines.push(replaced);
+      } else {
+        // Location 없으면 inventoryQuantities 제거
+        if (obj.input?.variants) {
+          for (const v of obj.input.variants) {
+            delete v.inventoryQuantities;
+            v.inventoryItem = { tracked: false };
+          }
+        }
+        lines.push(JSON.stringify(obj));
+      }
     } catch {}
   }
 
