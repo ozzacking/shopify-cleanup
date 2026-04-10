@@ -330,9 +330,15 @@ async function main() {
       const handle = obj.input?.handle?.toLowerCase();
       if (handle && existingHandles.has(handle)) { skippedDup++; continue; }
 
+      // metafield namespace "cj" → "cjdrop" (최소 3자 필요)
+      if (obj.input?.metafields) {
+        for (const mf of obj.input.metafields) {
+          if (mf.namespace === 'cj') mf.namespace = 'cjdrop';
+        }
+      }
+
       if (locationId) {
-        // Location ID 교체
-        const replaced = line.replace(/__LOCATION_ID__/g, locationId);
+        const replaced = JSON.stringify(obj).replace(/__LOCATION_ID__/g, locationId);
         lines.push(replaced);
       } else {
         // Location 없으면 inventoryQuantities 제거
