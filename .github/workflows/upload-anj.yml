@@ -1,0 +1,25 @@
+name: Upload Products to A&J Company
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  upload-anj:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Download product dataset
+        run: curl -L -o products_anj.jsonl https://github.com/ozzacking/shopify-cleanup/releases/download/anj-dataset-v1/products_anj.jsonl
+      - name: Upload products to A&J Company
+        env:
+          SHOP: p11pu6-uw.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_ANJCOMPANY }}
+          JSONL_FILE: products_anj.jsonl
+        run: node upload_anj.js
+
