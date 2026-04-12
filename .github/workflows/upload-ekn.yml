@@ -1,0 +1,25 @@
+name: Upload Products to EastKentNorth
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  upload-ekn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Download product dataset
+        run: curl -L -o products_ekn.jsonl https://github.com/ozzacking/shopify-cleanup/releases/download/ekn-dataset-v1/products_ekn.jsonl
+      - name: Upload products to EastKentNorth
+        env:
+          SHOP: cwzgqw-jv.myshopify.com
+          TOKEN: ${{ secrets.TOKEN_EASTKENTNORTH }}
+          JSONL_FILE: products_ekn.jsonl
+        run: node upload_ekn.js
+
