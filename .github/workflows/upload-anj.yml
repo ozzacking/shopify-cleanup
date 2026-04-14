@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: '20'
       - name: Download product dataset
-        run: curl -L -o products_anj.jsonl https://github.com/ozzacking/shopify-cleanup/releases/download/anj-dataset-v1/products_anj.jsonl
+        run: curl -L -o products_anj.jsonl https://github.com/ozzacking/shopify-cleanup/releases/download/anj-dataset-v2/products_anj2.jsonl
       - name: Upload products to A&J Company
         env:
           SHOP: p11pu6-uw.myshopify.com
