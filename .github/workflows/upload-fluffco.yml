@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: '20'
       - name: Download product dataset
-        run: curl -L -o products_fluffco.jsonl https://github.com/ozzacking/shopify-cleanup/releases/download/fluffco-dataset-v2/products_fluffco2.jsonl
+        run: curl -L -o products_fluffco.jsonl https://github.com/ozzacking/shopify-cleanup/releases/download/fluffco-dataset-v3/products_fluffco3.jsonl
       - name: Upload products to FluffCo
         env:
           SHOP: zvyc6g-jz.myshopify.com
